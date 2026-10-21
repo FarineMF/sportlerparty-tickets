@@ -10,7 +10,7 @@
 //   mail/<id>       → Mailversand je Bestellung ({ at, to } bzw. { error })
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
-import { mailConfigured, mailSender, sendTicketMail, previewMail, mailError } from "../mail.mjs";
+import { mailConfigured, mailSender, sendTicketMail, previewMail, mailError, DEFAULT_REPLY_TO } from "../mail.mjs";
 
 export const config = { path: "/api/*" };
 
@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
   mail_subject: "Dein Ticket für die Sportlerparty.",
   mail_text: "Hallo {vorname},\n\nschön, dass du dabei bist! Im Anhang findest du {anzahl} für die Sportlerparty.\n\nSo kommst du rein:\n• QR-Code am Einlass auf dem Handy zeigen (oder das PDF im Anhang ausdrucken)\n• Jeder Code ist nur einmal gültig – bitte nicht weitergeben\n• Studierenden- oder Mitarbeitendenausweis mitbringen\n\nWir freuen uns auf dich!\nDein UNI:Sport-Team",
   mail_footer: "UNI:Sport Kassel · Hochschulsport der Universität Kassel\nDu bekommst diese Mail, weil du ein Ticket für die Sportlerparty gebucht hast.",
-  reply_to: "",
+  reply_to: "sportreferat@uni-kassel.de",
 };
 
 // Vorschau-Deploys bekommen einen eigenen, leeren Speicher (wie bei der Kasse).
@@ -369,7 +369,7 @@ async function handler(req, context) {
     const n = url.searchParams.get("n") === "2" ? 2 : 1;
     const tickets = n === 2 ? [{ code: "SP-TEST-TEST-01" }, { code: "SP-TEST-TEST-02" }] : [{ code: "SP-TEST-TEST-00" }];
     const m = await previewMail({ order: { vorname: "Lena", nachname: "Beispiel" }, tickets, settings, logo: await st.get("logo", { type: "arrayBuffer" }) });
-    return json({ subject: m.subject, html: m.html, from: mailSender() || "(noch keine Absender-Adresse eingerichtet)", reply_to: settings.reply_to || "" });
+    return json({ subject: m.subject, html: m.html, from: mailSender() || "(noch keine Absender-Adresse eingerichtet)", reply_to: settings.reply_to || DEFAULT_REPLY_TO });
   }
 
   /* --- Mailversand: der Browser erzeugt das PDF, der Server schickt es an die gespeicherte Adresse --- */

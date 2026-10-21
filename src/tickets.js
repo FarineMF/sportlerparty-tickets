@@ -17,7 +17,6 @@ const C = {
   onSurface: '#22324A', // Schrift auf Fläche
   accent: '#CC178D',    // Schrift auf Weiß
   magenta: '#C80A85',
-  spray: '#EC40A6',     // Pink hell – nur als Spray-Rand
   white: '#FFFFFF',
 };
 
@@ -68,22 +67,6 @@ function drawQr(page, text, x, y, size) {
   }
 }
 
-// Spray-Rand (Brand-Kit: Pink hell #EC40A6 nur als Spray-Rand) – feine, nach außen ausdünnende Punkte
-function drawSpray(page, edgeY, seed) {
-  let x = seed >>> 0 || 1;
-  const rnd = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 100000) / 100000; };
-  const gauss = () => { let u = 0; for (let k = 0; k < 4; k++) u += rnd(); return (u - 2) / 0.58; };
-  const pink = hex(C.spray);
-  for (let k = 0; k < 2400; k++) {
-    const px = rnd() * W;
-    const d = gauss() * 4.5;                 // Abstand zur Kante
-    const fall = Math.max(0, 1 - Math.abs(d) / 16);
-    if (rnd() > fall) continue;
-    const r = 0.15 + rnd() * rnd() * 1.0 * fall;
-    page.drawCircle({ x: px, y: edgeY + d, size: r, color: pink, opacity: 0.35 + 0.6 * fall });
-  }
-}
-
 async function buildTicketsPdf(order, tickets, s, assets) {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -129,9 +112,8 @@ async function buildTicketsPdf(order, tickets, s, assets) {
       page.drawText(k, { x: W - PAD - reg.widthOfTextAtSize(k, 8.5), y: edgeY + 52, size: 8.5, font: reg, color: ink });
     }
 
-    // Spray-Rand + Ticket-Kerben
-    let seed = 0; for (const ch of t.code) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-    drawSpray(page, edgeY, seed);
+    // Magenta-Akzentband an der Kante + Ticket-Kerben
+    page.drawRectangle({ x: 0, y: edgeY - 2.5, width: W, height: 5, color: hex(C.magenta) });
     page.drawCircle({ x: 0, y: edgeY, size: 9, color: hex(C.white) });
     page.drawCircle({ x: W, y: edgeY, size: 9, color: hex(C.white) });
 
@@ -143,6 +125,7 @@ async function buildTicketsPdf(order, tickets, s, assets) {
     const boxH = 16 + rowLines.reduce((a, l) => a + l.length * 13 + 7, 0) + 4;
     const boxTop = edgeY - 18;
     page.drawRectangle({ x: PAD, y: boxTop - boxH, width: inner, height: boxH, color: hex(C.infobox) });
+    page.drawRectangle({ x: PAD, y: boxTop - boxH, width: 3, height: boxH, color: hex(C.magenta) });
     let ry = boxTop - 22;
     rows.forEach((r, idx) => {
       page.drawText(r[0], { x: PAD + 12, y: ry + 1, size: 8.5, font: reg, color: ink });
@@ -165,18 +148,25 @@ async function buildTicketsPdf(order, tickets, s, assets) {
     const claim = 'Sport, Bewegung & Gesundheit.';
     page.drawText(claim, { x: W - PAD - bold.widthOfTextAtSize(claim, 7.5), y: footBase + 2, size: 7.5, font: bold, color: hex(C.accent) });
     const lineY = footBase + logoMaxH + 20;
-    page.drawLine({ start: { x: PAD, y: lineY }, end: { x: W - PAD, y: lineY }, thickness: 0.6, color: hex(C.magenta), opacity: 0.6 });
+    page.drawLine({ start: { x: PAD, y: lineY }, end: { x: W - PAD, y: lineY }, thickness: 1, color: hex(C.magenta) });
     const noteLines = wrap(s.note, reg, 7.2, inner).slice(0, 3);
     const noteTop = lineY + 10 + (noteLines.length - 1) * 9.5;
     noteLines.forEach((ln, li) => page.drawText(ln, { x: PAD, y: noteTop - li * 9.5, size: 7.2, font: reg, color: ink }));
 
     // ---- QR-Code (füllt den Platz zwischen Infobox und Hinweis)
-    const qrTop = boxTop - boxH - 14;
-    const space = qrTop - (noteTop + 12) - 24;
+    const qrTop = boxTop - boxH - 22;
+    const space = qrTop - (noteTop + 12) - 34;
     const qrSize = Math.max(96, Math.min(150, space));
     const qrX = (W - qrSize) / 2;
     drawQr(page, t.code, qrX, qrTop - qrSize, qrSize);
-    page.drawText(t.code, { x: (W - reg.widthOfTextAtSize(t.code, 9)) / 2, y: qrTop - qrSize - 11, size: 9, font: reg, color: ink });
+    // Magenta-Scanrahmen (Ecken) um den QR-Code
+    const fr = 8, arm = 16, th = 2.2, mg = hex(C.magenta);
+    const x0 = qrX - fr, x1 = qrX + qrSize + fr, y0 = qrTop - qrSize - fr, y1 = qrTop + fr;
+    for (const [cx, cy, dx, dy] of [[x0, y1, 1, -1], [x1, y1, -1, -1], [x0, y0, 1, 1], [x1, y0, -1, 1]]) {
+      page.drawRectangle({ x: Math.min(cx, cx + dx * arm), y: dy > 0 ? cy : cy - th, width: arm, height: th, color: mg });
+      page.drawRectangle({ x: dx > 0 ? cx : cx - th, y: Math.min(cy, cy + dy * arm), width: th, height: arm, color: mg });
+    }
+    page.drawText(t.code, { x: (W - bold.widthOfTextAtSize(t.code, 9)) / 2, y: y0 - 13, size: 9, font: bold, color: hex(C.accent) });
   });
 
   return doc.save();

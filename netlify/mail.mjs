@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 
 export const mailConfigured = () => !!(process.env.TICKETS_MAIL_ADRESSE && process.env.TICKETS_MAIL_PASSWORT);
 export const mailSender = () => process.env.TICKETS_MAIL_ADRESSE || "";
+export const DEFAULT_REPLY_TO = "sportreferat@uni-kassel.de";
 
 let transport = null;
 function getTransport() {
@@ -62,7 +63,7 @@ export function buildMail({ order, tickets, settings: s, img }) {
   const qrHtml = tickets.map((t, i) => `
           <td style="padding:6px 10px;text-align:center;vertical-align:top;">
             <img src="${img.qr(i)}" width="168" height="168" alt="QR-Code ${esc(t.code)}" style="display:block;margin:0 auto;border:0;">
-            <div style="font:12px Arial,Helvetica,sans-serif;color:#22324A;margin-top:4px;">${tickets.length > 1 ? `Ticket ${i + 1} · ` : ""}${esc(t.code)}</div>
+            <div style="font:bold 12px Arial,Helvetica,sans-serif;color:#CC178D;margin-top:6px;">${tickets.length > 1 ? `Ticket ${i + 1} · ` : ""}${esc(t.code)}</div>
           </td>`).join("");
   const rows = [["Datum", s.date], ["Einlass", s.time], ["Ort", s.location]].filter((r) => r[1])
     .map(([k, v]) => `<tr><td style="padding:3px 14px 3px 0;font:13px Arial,Helvetica,sans-serif;color:#22324A;white-space:nowrap;vertical-align:top;">${k}</td>
@@ -70,7 +71,7 @@ export function buildMail({ order, tickets, settings: s, img }) {
   const logo = img.logo
     ? `<img src="${img.logo}" alt="UNI:Sport Kassel" height="34" style="display:block;height:34px;width:auto;border:0;">`
     : `<div style="font:bold 16px Arial,Helvetica,sans-serif;color:#22324A;">UNI:Sport Kassel</div>`;
-  const spray = `<div style="height:6px;line-height:6px;font-size:0;background:#9FBBD8;border-bottom:3px dotted #EC40A6;"></div>`;
+  const band = `<div style="height:5px;line-height:5px;font-size:0;background:#C80A85;">&nbsp;</div>`;
 
   const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(subject)}</title></head>
@@ -83,16 +84,16 @@ export function buildMail({ order, tickets, settings: s, img }) {
       <div style="font:bold 34px/1.1 Arial,Helvetica,sans-serif;color:#22324A;margin-top:20px;">${esc(s.headline)}</div>
       <div style="font:16px Arial,Helvetica,sans-serif;color:#22324A;margin-top:6px;">${esc(s.subline)}</div>
     </td></tr>
-    <tr><td>${spray}</td></tr>
+    <tr><td>${band}</td></tr>
     <tr><td style="padding:24px 26px 8px;font:15px/1.55 Arial,Helvetica,sans-serif;color:#22324A;">${textToHtml(text)}</td></tr>
     <tr><td style="padding:4px 26px 0;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E1F2FF;"><tr><td style="padding:14px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E1F2FF;border-left:4px solid #C80A85;"><tr><td style="padding:14px 16px;">
         <table role="presentation" cellpadding="0" cellspacing="0">${rows}</table>
       </td></tr></table>
     </td></tr>
     <tr><td align="center" style="padding:20px 16px 6px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>${qrHtml}</tr></table></td></tr>
     <tr><td style="padding:6px 26px 18px;font:12px/1.5 Arial,Helvetica,sans-serif;color:#22324A;text-align:center;">${tickets.length > 1 ? "Die Tickets hängen" : "Das Ticket hängt"} zusätzlich als PDF an dieser Mail.</td></tr>
-    <tr><td style="padding:0 26px;"><div style="border-top:1px solid #C80A85;height:0;line-height:0;font-size:0;">&nbsp;</div></td></tr>
+    <tr><td style="padding:0 26px;"><div style="height:2px;line-height:2px;font-size:0;background:#C80A85;">&nbsp;</div></td></tr>
     <tr><td style="padding:16px 26px 8px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td style="vertical-align:bottom;">
@@ -127,7 +128,7 @@ export async function previewMail({ order, tickets, settings, logo }) {
 export async function sendTicketMail({ to, order, tickets, settings, pdf, pdfName, logo }) {
   const qrs = await Promise.all(tickets.map((t) => qrPng(t.code)));
   const m = buildMail({ order, tickets, settings, img: { qr: (i) => `cid:qr${i}`, logo: logo ? "cid:logo" : null } });
-  const replyTo = String(settings.reply_to || "").trim();
+  const replyTo = String(settings.reply_to || DEFAULT_REPLY_TO).trim();
   await getTransport().sendMail({
     from: { name: process.env.TICKETS_MAIL_NAME || "UNI:Sport Kassel", address: mailSender() },
     ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo) ? { replyTo } : {}),
