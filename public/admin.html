@@ -95,6 +95,29 @@
         <button class="btn ghost" id="zipAll">Alle Tickets (ZIP)</button>
       </div>
     </div>
+
+    <div class="card" id="mailCard">
+      <h2>Automatisch per Mail verschicken.</h2>
+      <div id="mailSetup" class="notice hidden">
+        Noch nicht eingerichtet. In Netlify unter <b>Environment variables</b> anlegen:
+        <code>TICKETS_MAIL_ADRESSE</code> (die Gmail-Adresse) und <code>TICKETS_MAIL_PASSWORT</code> (Gmail-App-Passwort), danach neu deployen.
+      </div>
+      <div id="mailReady" class="hidden">
+        <p class="muted small">Absender: <b id="mailFrom"></b>. Jede Person bekommt eine Mail mit ihrem PDF im Anhang und dem QR-Code direkt in der Mail.
+          Gmail erlaubt ca. <b>500 Mails pro Tag</b> – bei mehr einfach am nächsten Tag weiter senden. <b>Fenster während des Versands offen lassen.</b></p>
+        <div id="mailInfo" class="muted"></div>
+        <div class="progress hidden" id="mailProg"><div id="mailBar"></div></div>
+        <div class="actions">
+          <button class="btn" id="mailStart">Alle noch nicht gemailten senden</button>
+          <button class="btn ghost hidden" id="mailStop">Anhalten</button>
+        </div>
+        <h3 style="margin-top:20px">Testmail.</h3>
+        <div class="row">
+          <div><label for="testTo">An</label><input type="email" id="testTo" placeholder="vorname.nachname@uni-kassel.de"></div>
+          <div style="flex:0 0 auto"><button class="btn ghost" id="testSend">Testmail senden</button></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Einstellungen -->
@@ -117,6 +140,14 @@
       <textarea id="s_note" style="min-height:70px"></textarea>
       <label for="s_party_name">Kurzname (für Dateinamen)</label>
       <input type="text" id="s_party_name">
+    </div>
+    <div class="card">
+      <h3>E-Mail.</h3>
+      <p class="muted small">Nur für den automatischen Versand.</p>
+      <label for="s_mail_subject">Betreff</label>
+      <input type="text" id="s_mail_subject">
+      <label for="s_mail_text">Text <span class="small">(Platzhalter: {vorname}, {nachname}, {anzahl})</span></label>
+      <textarea id="s_mail_text" style="min-height:160px"></textarea>
     </div>
     <div class="card">
       <h3>Logo.</h3>

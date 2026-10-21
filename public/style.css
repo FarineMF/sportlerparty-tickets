@@ -95,3 +95,4 @@ th { font-size: 12px; color: var(--muted); font-weight: 700; background: var(--b
   h1 { font-size: 24px; }
   .hide-sm { display: none; }
 }
+code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: rgba(255,255,255,.6); padding: 1px 4px; border-radius: 4px; }

@@ -8,13 +8,14 @@
     "dev": "node scripts/dev-server.mjs"
   },
   "dependencies": {
-    "@netlify/blobs": "^11.1.2"
+    "@netlify/blobs": "^11.1.2",
+    "nodemailer": "^10.1.7",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
     "esbuild": "^0.25.0",
     "jszip": "^3.10.1",
-    "pdf-lib": "^1.17.1",
-    "qrcode": "^1.5.4"
+    "pdf-lib": "^1.17.1"
   }
 }

@@ -7,8 +7,10 @@
 //   settings        → Texte fürs Ticket
 //   logo            → PNG
 //   secret          → automatisch erzeugter Schlüssel für Anmelde-Cookies
+//   mail/<id>       → Mailversand je Bestellung ({ at, to } bzw. { error })
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
+import { mailConfigured, mailSender, sendTicketMail, mailError } from "../mail.mjs";
 
 export const config = { path: "/api/*" };
 
@@ -25,6 +27,8 @@ const DEFAULT_SETTINGS = {
   location: "Location folgt",
   price: "8,00 €",
   note: "Bitte zeig dieses Ticket am Einlass auf dem Handy oder ausgedruckt vor. Jeder QR-Code ist nur einmal gültig. Halte deinen Studierendenausweis bereit.",
+  mail_subject: "Dein Ticket für die Sportlerparty.",
+  mail_text: "Hallo {vorname},\n\nschön, dass du dabei bist! Im Anhang findest du {anzahl} für die Sportlerparty als PDF.\nZeig den QR-Code am Einlass einfach auf dem Handy oder ausgedruckt vor.\n\nWir freuen uns auf dich!\nDein UNI:Sport-Team",
 };
 
 // Vorschau-Deploys bekommen einen eigenen, leeren Speicher (wie bei der Kasse).
@@ -103,6 +107,12 @@ const isEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const now = () => new Date().toISOString();
 
 async function loadOrders(st) { return (await st.get("orders", { type: "json" })) || []; }
+async function mailStatus(st) {
+  const { blobs } = await st.list({ prefix: "mail/" });
+  const out = new Map();
+  await Promise.all(blobs.map(async (b) => out.set(Number(b.key.slice(5)), await st.get(b.key, { type: "json" }))));
+  return out;
+}
 async function checkinKeys(st) {
   const { blobs } = await st.list({ prefix: "checkin/" });
   return new Set(blobs.map((b) => b.key.slice("checkin/".length)));
@@ -200,8 +210,16 @@ async function handler(req, context) {
         tickets++; if (inside.has(t.code)) drin++;
       }
     }
-    return json({ tickets, drin, storniert, personen: orders.length, nicht_exportiert: offen,
-      keine_mail: orders.filter((o) => !isEmail(o.email)).length });
+    const res = { tickets, drin, storniert, personen: orders.length, nicht_exportiert: offen,
+      keine_mail: orders.filter((o) => !isEmail(o.email)).length, mail: mailConfigured() };
+    if (isAdmin && res.mail) {
+      const ms = await mailStatus(st);
+      res.mail_absender = mailSender();
+      res.gemailt = [...ms.values()].filter((m) => m?.at).length;
+      res.mail_fehler = [...ms.values()].filter((m) => m?.error).length;
+      res.mail_offen = orders.filter((o) => isEmail(o.email) && !ms.get(o.id)?.at && o.tickets.some((t) => t.status !== "storniert")).length;
+    }
+    return json(res);
   }
 
   if (route === "lookup" && method === "GET") {
@@ -284,7 +302,12 @@ async function handler(req, context) {
   if (route === "orders" && method === "GET") {
     const orders = await loadOrders(st);
     const inside = await checkinKeys(st);
-    for (const o of orders) for (const t of o.tickets) t.drin = inside.has(t.code);
+    const ms = await mailStatus(st);
+    for (const o of orders) {
+      for (const t of o.tickets) t.drin = inside.has(t.code);
+      const m = ms.get(o.id);
+      o.mailed_at = m?.at || null; o.mail_to = m?.to || null; o.mail_error = m?.error || null;
+    }
     orders.sort((a, b) => (a.nachname + a.vorname).localeCompare(b.nachname + b.vorname, "de"));
     return json(orders);
   }
@@ -316,7 +339,7 @@ async function handler(req, context) {
         const i = orders.findIndex((x) => x.id === id);
         if (i >= 0) removed = orders.splice(i, 1)[0];
       });
-      if (removed) await Promise.all(removed.tickets.map((t) => st.delete(`checkin/${t.code}`)));
+      if (removed) await Promise.all([...removed.tickets.map((t) => st.delete(`checkin/${t.code}`)), st.delete(`mail/${removed.id}`)]);
       return json({ ok: true });
     }
   }
@@ -336,6 +359,40 @@ async function handler(req, context) {
       });
       if (r?.missing) return fail("Ticket nicht gefunden.", 404);
     }
+    return json({ ok: true });
+  }
+
+  /* --- Mailversand: der Browser erzeugt das PDF, der Server schickt es an die gespeicherte Adresse --- */
+  if (route === "send-mail" && method === "POST") {
+    if (!mailConfigured()) return fail("Mailversand ist nicht eingerichtet (TICKETS_MAIL_ADRESSE / TICKETS_MAIL_PASSWORT fehlen).");
+    const pdf = Buffer.from(String(body.pdf || ""), "base64");
+    if (pdf.length < 500 || pdf.length > 3_000_000 || pdf.subarray(0, 5).toString() !== "%PDF-") return fail("Ungültiges PDF.");
+    const settings = { ...DEFAULT_SETTINGS, ...((await st.get("settings", { type: "json" })) || {}) };
+    if (body.test) {
+      const to = norm(body.to).toLowerCase();
+      if (!isEmail(to)) return fail("Bitte eine gültige Adresse angeben.");
+      try {
+        await sendTicketMail({ to, order: { vorname: "Lena", nachname: "Beispiel" }, tickets: [{ code: "SP-TEST-TEST-00" }],
+          settings, pdf, pdfName: "Ticket-Beispiel.pdf" });
+      } catch (e) { const er = mailError(e); return json({ error: er.text, auth: !!er.auth, limit: !!er.limit }, 502); }
+      return json({ ok: true });
+    }
+    const id = Number(body.id);
+    const o = (await loadOrders(st)).find((x) => x.id === id);
+    if (!o) return fail("Person nicht gefunden.", 404);
+    if (!isEmail(o.email)) return fail("Keine gültige E-Mail-Adresse hinterlegt.");
+    const tickets = o.tickets.filter((t) => t.status !== "storniert");
+    if (!tickets.length) return fail("Keine gültigen Tickets.");
+    const prev = await st.get(`mail/${id}`, { type: "json" });
+    if (prev?.at && !body.force) return json({ ok: true, skipped: true });
+    try {
+      await sendTicketMail({ to: o.email, order: o, tickets, settings, pdf, pdfName: String(body.name || "Ticket.pdf").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 80) });
+    } catch (e) {
+      const er = mailError(e);
+      await st.setJSON(`mail/${id}`, { error: er.text, tried: now() });
+      return json({ error: er.text, auth: !!er.auth, limit: !!er.limit }, 502);
+    }
+    await st.setJSON(`mail/${id}`, { at: now(), to: o.email });
     return json({ ok: true });
   }
 
@@ -361,8 +418,10 @@ async function handler(req, context) {
 
   if (route === "wipe" && method === "POST") {
     if (body.confirm !== "LÖSCHEN") return fail("Bitte LÖSCHEN eintippen.");
-    const { blobs } = await st.list({ prefix: "checkin/" });
-    await Promise.all(blobs.map((b) => st.delete(b.key)));
+    for (const prefix of ["checkin/", "mail/"]) {
+      const { blobs } = await st.list({ prefix });
+      await Promise.all(blobs.map((b) => st.delete(b.key)));
+    }
     await st.delete("orders");
     return json({ ok: true });
   }

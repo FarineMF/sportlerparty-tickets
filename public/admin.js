@@ -49,7 +49,79 @@ async function loadStats() {
     : 'Alle Tickets wurden schon heruntergeladen.';
   $('zipNew').disabled = !s.nicht_exportiert;
   $('zipAll').disabled = !s.personen;
+  mailOn = !!s.mail;
+  $('mailSetup').classList.toggle('hidden', mailOn);
+  $('mailReady').classList.toggle('hidden', !mailOn);
+  if (mailOn && !mailRunning) {
+    $('mailFrom').textContent = s.mail_absender;
+    $('mailInfo').textContent = `${s.gemailt} gemailt · ${s.mail_offen} noch offen` +
+      (s.mail_fehler ? ` · ${s.mail_fehler} mit Fehler (werden beim nächsten Durchlauf erneut versucht)` : '') +
+      (s.keine_mail ? ` · ${s.keine_mail} ohne gültige E-Mail` : '');
+    $('mailStart').disabled = !s.mail_offen;
+  }
 }
+
+// ---------- Automatischer Mailversand ----------
+let mailOn = false, mailRunning = false, mailStopReq = false;
+function toB64(bytes) {
+  let bin = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+async function sendOne(o, force) {
+  const bytes = await SPTicket.orderPdf(o, await getSettings());
+  const r = await fetch('/api/send-mail', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: o.id, pdf: toB64(bytes), name: SPTicket.fileBase(o) + '.pdf', force: !!force }) });
+  if (r.status === 401) { location.href = '/'; throw new Error('Nicht angemeldet'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(d.error || 'Fehler'); e.auth = d.auth; e.limit = d.limit; throw e; }
+  return d;
+}
+const isMail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e || '');
+async function startMail() {
+  const all = await api('/api/orders');
+  const list = all.filter(o => isMail(o.email) && !o.mailed_at && o.tickets.some(t => t.status !== 'storniert'));
+  if (!list.length) { toast('Alle haben ihre Tickets schon per Mail.'); return; }
+  if (!confirm(`${list.length} Mail(s) jetzt verschicken?\n\nBitte dieses Fenster offen lassen, bis der Versand fertig ist.`)) return;
+  mailRunning = true; mailStopReq = false;
+  $('mailStart').disabled = true; $('mailStop').classList.remove('hidden');
+  $('mailProg').classList.remove('hidden');
+  let ok = 0, err = 0, i = 0;
+  window.onbeforeunload = () => 'Der Mailversand läuft noch.';
+  for (const o of list) {
+    if (mailStopReq) break;
+    i++;
+    $('mailInfo').textContent = `Sende ${i} von ${list.length} … (${ok} ok, ${err} Fehler)`;
+    try { await sendOne(o); ok++; }
+    catch (e) {
+      err++;
+      if (e.auth || e.limit) { toast(e.message); break; }
+    }
+    $('mailBar').style.width = Math.round(i / list.length * 100) + '%';
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  window.onbeforeunload = null;
+  mailRunning = false;
+  $('mailStop').classList.add('hidden'); $('mailProg').classList.add('hidden');
+  toast(`Versand ${mailStopReq ? 'angehalten' : 'fertig'}: ${ok} gesendet${err ? `, ${err} Fehler` : ''}.`);
+  loadStats();
+}
+$('mailStart').onclick = startMail;
+$('mailStop').onclick = () => { mailStopReq = true; $('mailStop').disabled = true; setTimeout(() => $('mailStop').disabled = false, 3000); };
+$('testSend').onclick = async () => {
+  const to = $('testTo').value.trim();
+  if (!isMail(to)) { toast('Bitte eine gültige Adresse eingeben.'); return; }
+  $('testSend').disabled = true;
+  try {
+    const bytes = await SPTicket.orderPdf({ vorname: 'Lena', nachname: 'Beispiel', kategorie: 'S-UNIK',
+      tickets: [{ nr: 1, code: 'SP-TEST-TEST-00', status: 'gueltig' }] }, await getSettings());
+    const r = await fetch('/api/send-mail', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ test: true, to, pdf: toB64(bytes) }) });
+    const d = await r.json().catch(() => ({}));
+    toast(r.ok ? 'Testmail ist raus.' : (d.error || 'Fehler'));
+  } catch (e) { toast(e.message); }
+  $('testSend').disabled = false;
+};
 
 // ---------- Tickets als ZIP ----------
 let settingsCache = null;
@@ -185,7 +257,7 @@ $('doImport').onclick = async () => {
 // ---------- Teilnehmende ----------
 let qTimer, ordersCache = [];
 $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(renderOrders, 150); };
-async function loadOrders() { ordersCache = await api('/api/orders'); renderOrders(); }
+async function loadOrders() { if (!mailOn) { try { mailOn = !!(await api('/api/stats')).mail; } catch (_) {} } ordersCache = await api('/api/orders'); renderOrders(); }
 function renderOrders() {
   const q = $('q').value.trim().toLowerCase();
   const list = !q ? ordersCache : ordersCache.filter(o =>
@@ -202,9 +274,12 @@ function renderOrders() {
           ${t.status === 'storniert' ? '<option value="reaktivieren">reaktivieren</option>' : '<option value="stornieren">stornieren</option>'}
           ${t.drin ? '<option value="zuruecksetzen">Einlass zurücksetzen</option>' : '<option value="einlassen">manuell einlassen</option>'}
         </select></div>`).join('')}</td>
-      <td>${o.exported_at ? `<span class="pill ok" title="${esc(new Date(o.exported_at).toLocaleString('de-DE'))}">heruntergeladen</span>` : '<span class="pill">neu</span>'}</td>
+      <td>${o.exported_at ? `<span class="pill ok" title="${esc(new Date(o.exported_at).toLocaleString('de-DE'))}">heruntergeladen</span>` : (o.mailed_at ? '' : '<span class="pill">neu</span>')}
+        ${o.mailed_at ? `${o.exported_at ? '<br>' : ''}<span class="pill ok" title="${esc(o.mail_to)} · ${esc(new Date(o.mailed_at).toLocaleString('de-DE'))}">gemailt</span>` : ''}
+        ${o.mail_error && !o.mailed_at ? `<br><span class="pill bad" title="${esc(o.mail_error)}">Mail-Fehler</span>` : ''}</td>
       <td style="white-space:nowrap">
         <button class="btn ghost sm" data-act="pdf" data-id="${o.id}">PDF</button>
+        ${mailOn && o.email ? `<button class="btn ghost sm" data-act="mail" data-id="${o.id}">${o.mailed_at ? 'Erneut mailen' : 'Mailen'}</button>` : ''}
         <button class="btn ghost sm" data-act="del" data-id="${o.id}" title="Löschen">✕</button>
       </td>
     </tr>`).join('');
@@ -224,6 +299,11 @@ $('ordersTable').addEventListener('click', async e => {
       SPTicket.download(new Blob([bytes], { type: 'application/pdf' }), SPTicket.fileBase(o) + '.pdf');
       b.disabled = false;
       return;
+    } else if (b.dataset.act === 'mail') {
+      const o = ordersCache.find(x => x.id === id);
+      if (o.mailed_at && !confirm(`Ticket nochmal an ${o.email} schicken?`)) return;
+      b.disabled = true; b.textContent = '…';
+      await sendOne(o, true); toast('Mail gesendet.');
     } else if (b.dataset.act === 'del') {
       if (!confirm('Diese Person inkl. aller Tickets löschen?')) return;
       await api(`/api/orders/${id}`, { method: 'DELETE' });
@@ -239,7 +319,7 @@ $('ordersTable').addEventListener('change', async e => {
 });
 
 // ---------- Einstellungen ----------
-const SKEYS = ['headline', 'subline', 'date', 'time', 'location', 'price', 'note', 'party_name'];
+const SKEYS = ['headline', 'subline', 'date', 'time', 'location', 'price', 'note', 'party_name', 'mail_subject', 'mail_text'];
 async function loadSettings() {
   const s = await api('/api/settings');
   SKEYS.forEach(k => { $('s_' + k).value = s[k] || ''; });
