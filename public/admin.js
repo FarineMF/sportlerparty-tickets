@@ -107,6 +107,25 @@ async function startMail() {
   loadStats();
 }
 $('mailStart').onclick = startMail;
+
+// Mail-Vorschau (zeigt genau die HTML-Mail, die verschickt wird)
+async function showMailPreview() {
+  try {
+    if (currentTab === 'einstellungen') await saveSettings();
+    const m = await api('/api/mail-preview');
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML = `<div class="box"><div class="bar"><div class="t"><b>Betreff:</b> ${esc(m.subject)}<br>
+      <b>Von:</b> UNI:Sport Kassel &lt;${esc(m.from)}&gt;${m.reply_to ? ` · <b>Antwort an:</b> ${esc(m.reply_to)}` : ''}<br>
+      <b>Anhang:</b> Ticket als PDF</div><button class="btn ghost sm">Schließen</button></div><iframe title="Mail-Vorschau"></iframe></div>`;
+    wrap.querySelector('iframe').srcdoc = m.html;
+    const close = () => wrap.remove();
+    wrap.querySelector('button').onclick = close;
+    wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+    document.body.appendChild(wrap);
+  } catch (e) { toast(e.message); }
+}
+document.querySelectorAll('[data-preview]').forEach(b => b.addEventListener('click', showMailPreview));
 $('mailStop').onclick = () => { mailStopReq = true; $('mailStop').disabled = true; setTimeout(() => $('mailStop').disabled = false, 3000); };
 $('testSend').onclick = async () => {
   const to = $('testTo').value.trim();
@@ -319,7 +338,7 @@ $('ordersTable').addEventListener('change', async e => {
 });
 
 // ---------- Einstellungen ----------
-const SKEYS = ['headline', 'subline', 'date', 'time', 'location', 'price', 'note', 'party_name', 'mail_subject', 'mail_text'];
+const SKEYS = ['headline', 'subline', 'date', 'time', 'location', 'price', 'note', 'party_name', 'mail_subject', 'mail_text', 'mail_footer', 'reply_to'];
 async function loadSettings() {
   const s = await api('/api/settings');
   SKEYS.forEach(k => { $('s_' + k).value = s[k] || ''; });

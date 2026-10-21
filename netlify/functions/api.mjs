@@ -10,7 +10,7 @@
 //   mail/<id>       → Mailversand je Bestellung ({ at, to } bzw. { error })
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
-import { mailConfigured, mailSender, sendTicketMail, mailError } from "../mail.mjs";
+import { mailConfigured, mailSender, sendTicketMail, previewMail, mailError } from "../mail.mjs";
 
 export const config = { path: "/api/*" };
 
@@ -26,9 +26,11 @@ const DEFAULT_SETTINGS = {
   time: "ab 21:00 Uhr",
   location: "Location folgt",
   price: "8,00 €",
-  note: "Bitte zeig dieses Ticket am Einlass auf dem Handy oder ausgedruckt vor. Jeder QR-Code ist nur einmal gültig. Halte deinen Studierendenausweis bereit.",
+  note: "Zeig dieses Ticket am Einlass auf dem Handy oder ausgedruckt vor. Jeder QR-Code ist nur einmal gültig – bitte nicht weitergeben. Ausweis nicht vergessen.",
   mail_subject: "Dein Ticket für die Sportlerparty.",
-  mail_text: "Hallo {vorname},\n\nschön, dass du dabei bist! Im Anhang findest du {anzahl} für die Sportlerparty als PDF.\nZeig den QR-Code am Einlass einfach auf dem Handy oder ausgedruckt vor.\n\nWir freuen uns auf dich!\nDein UNI:Sport-Team",
+  mail_text: "Hallo {vorname},\n\nschön, dass du dabei bist! Im Anhang findest du {anzahl} für die Sportlerparty.\n\nSo kommst du rein:\n• QR-Code am Einlass auf dem Handy zeigen (oder das PDF im Anhang ausdrucken)\n• Jeder Code ist nur einmal gültig – bitte nicht weitergeben\n• Studierenden- oder Mitarbeitendenausweis mitbringen\n\nWir freuen uns auf dich!\nDein UNI:Sport-Team",
+  mail_footer: "UNI:Sport Kassel · Hochschulsport der Universität Kassel\nDu bekommst diese Mail, weil du ein Ticket für die Sportlerparty gebucht hast.",
+  reply_to: "",
 };
 
 // Vorschau-Deploys bekommen einen eigenen, leeren Speicher (wie bei der Kasse).
@@ -362,6 +364,14 @@ async function handler(req, context) {
     return json({ ok: true });
   }
 
+  if (route === "mail-preview" && method === "GET") {
+    const settings = { ...DEFAULT_SETTINGS, ...((await st.get("settings", { type: "json" })) || {}) };
+    const n = url.searchParams.get("n") === "2" ? 2 : 1;
+    const tickets = n === 2 ? [{ code: "SP-TEST-TEST-01" }, { code: "SP-TEST-TEST-02" }] : [{ code: "SP-TEST-TEST-00" }];
+    const m = await previewMail({ order: { vorname: "Lena", nachname: "Beispiel" }, tickets, settings, logo: await st.get("logo", { type: "arrayBuffer" }) });
+    return json({ subject: m.subject, html: m.html, from: mailSender() || "(noch keine Absender-Adresse eingerichtet)", reply_to: settings.reply_to || "" });
+  }
+
   /* --- Mailversand: der Browser erzeugt das PDF, der Server schickt es an die gespeicherte Adresse --- */
   if (route === "send-mail" && method === "POST") {
     if (!mailConfigured()) return fail("Mailversand ist nicht eingerichtet (TICKETS_MAIL_ADRESSE / TICKETS_MAIL_PASSWORT fehlen).");
@@ -373,7 +383,7 @@ async function handler(req, context) {
       if (!isEmail(to)) return fail("Bitte eine gültige Adresse angeben.");
       try {
         await sendTicketMail({ to, order: { vorname: "Lena", nachname: "Beispiel" }, tickets: [{ code: "SP-TEST-TEST-00" }],
-          settings, pdf, pdfName: "Ticket-Beispiel.pdf" });
+          settings, pdf, pdfName: "Ticket-Beispiel.pdf", logo: await st.get("logo", { type: "arrayBuffer" }) });
       } catch (e) { const er = mailError(e); return json({ error: er.text, auth: !!er.auth, limit: !!er.limit }, 502); }
       return json({ ok: true });
     }
@@ -386,7 +396,7 @@ async function handler(req, context) {
     const prev = await st.get(`mail/${id}`, { type: "json" });
     if (prev?.at && !body.force) return json({ ok: true, skipped: true });
     try {
-      await sendTicketMail({ to: o.email, order: o, tickets, settings, pdf, pdfName: String(body.name || "Ticket.pdf").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 80) });
+      await sendTicketMail({ to: o.email, order: o, tickets, settings, pdf, logo: await st.get("logo", { type: "arrayBuffer" }), pdfName: String(body.name || "Ticket.pdf").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 80) });
     } catch (e) {
       const er = mailError(e);
       await st.setJSON(`mail/${id}`, { error: er.text, tried: now() });

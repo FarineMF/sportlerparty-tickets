@@ -17,6 +17,7 @@ const C = {
   onSurface: '#22324A', // Schrift auf Fläche
   accent: '#CC178D',    // Schrift auf Weiß
   magenta: '#C80A85',
+  spray: '#EC40A6',     // Pink hell – nur als Spray-Rand
   white: '#FFFFFF',
 };
 
@@ -67,6 +68,22 @@ function drawQr(page, text, x, y, size) {
   }
 }
 
+// Spray-Rand (Brand-Kit: Pink hell #EC40A6 nur als Spray-Rand) – feine, nach außen ausdünnende Punkte
+function drawSpray(page, edgeY, seed) {
+  let x = seed >>> 0 || 1;
+  const rnd = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 100000) / 100000; };
+  const gauss = () => { let u = 0; for (let k = 0; k < 4; k++) u += rnd(); return (u - 2) / 0.58; };
+  const pink = hex(C.spray);
+  for (let k = 0; k < 2400; k++) {
+    const px = rnd() * W;
+    const d = gauss() * 4.5;                 // Abstand zur Kante
+    const fall = Math.max(0, 1 - Math.abs(d) / 16);
+    if (rnd() > fall) continue;
+    const r = 0.15 + rnd() * rnd() * 1.0 * fall;
+    page.drawCircle({ x: px, y: edgeY + d, size: r, color: pink, opacity: 0.35 + 0.6 * fall });
+  }
+}
+
 async function buildTicketsPdf(order, tickets, s, assets) {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -81,91 +98,85 @@ async function buildTicketsPdf(order, tickets, s, assets) {
 
   const name = [order.vorname, order.nachname].filter(Boolean).join(' ');
   const inner = W - PAD * 2;
+  const ink = hex(C.onSurface);
 
   tickets.forEach((t, i) => {
     const page = doc.addPage([W, H]);
-    let y = H;
 
     // ---- Kopf: Fläche Winter-Blau
-    const surfaceH = 255;
-    page.drawRectangle({ x: 0, y: H - surfaceH, width: W, height: surfaceH, color: hex(C.surface) });
+    const surfaceH = 232;
+    const edgeY = H - surfaceH;
+    page.drawRectangle({ x: 0, y: edgeY, width: W, height: surfaceH, color: hex(C.surface) });
 
-    // Logo bzw. Absender
-    y = H - PAD;
-    if (logo) {
-      const maxH = 26, maxW = 120;
-      const sc = Math.min(maxH / logo.height, maxW / logo.width);
-      page.drawImage(logo, { x: PAD, y: y - logo.height * sc, width: logo.width * sc, height: logo.height * sc });
-    } else {
-      page.drawText('UNI:Sport Kassel', { x: PAD, y: y - 10, size: 10, font: bold, color: hex(C.onSurface) });
-    }
-    const counter = `Ticket ${i + 1} von ${tickets.length}`;
-    page.drawText(counter, {
-      x: W - PAD - reg.widthOfTextAtSize(counter, 8.5), y: y - 9, size: 8.5, font: reg, color: hex(C.onSurface),
-    });
+    // Kopfzeile
+    const topY = H - PAD - 9;
+    page.drawText(s.kicker || 'UNI:Sport Kassel', { x: PAD, y: topY, size: 8.5, font: bold, color: ink });
+    const counter = tickets.length > 1 ? `Ticket ${i + 1} von ${tickets.length}` : 'Ticket';
+    page.drawText(counter, { x: W - PAD - reg.widthOfTextAtSize(counter, 8.5), y: topY, size: 8.5, font: reg, color: ink });
 
     // Headline + Subline
     const hl = s.headline || 'Sportlerparty.';
-    const hlSize = fitSize(hl, bold, 40, 22, inner);
-    y = H - 118;
-    page.drawText(hl, { x: PAD, y, size: hlSize, font: bold, color: hex(C.onSurface) });
-    y -= 22;
-    page.drawText(s.subline || '', { x: PAD, y, size: 12.5, font: reg, color: hex(C.onSurface) });
+    const hlSize = fitSize(hl, bold, 42, 22, inner);
+    page.drawText(hl, { x: PAD, y: H - 104, size: hlSize, font: bold, color: ink });
+    page.drawText(s.subline || '', { x: PAD, y: H - 126, size: 12.5, font: reg, color: ink });
 
-    // Name auf der Fläche
-    y = H - surfaceH + 46;
-    page.drawText('Ticket für', { x: PAD, y, size: 8.5, font: reg, color: hex(C.onSurface) });
-    y -= 20;
-    const nSize = fitSize(name || 'Gast', bold, 17, 10, inner);
-    page.drawText(name || 'Gast', { x: PAD, y, size: nSize, font: bold, color: hex(C.onSurface) });
+    // Name
+    page.drawText('Ticket für', { x: PAD, y: edgeY + 52, size: 8.5, font: reg, color: ink });
+    const nSize = fitSize(name || 'Gast', bold, 18, 10, inner - 60);
+    page.drawText(name || 'Gast', { x: PAD, y: edgeY + 31, size: nSize, font: bold, color: ink });
     if (order.kategorie) {
       const k = String(order.kategorie);
-      page.drawText(k, { x: W - PAD - reg.widthOfTextAtSize(k, 8.5), y: y + 22, size: 8.5, font: reg, color: hex(C.onSurface) });
+      page.drawText(k, { x: W - PAD - reg.widthOfTextAtSize(k, 8.5), y: edgeY + 52, size: 8.5, font: reg, color: ink });
     }
 
-    // Ticket-Kerben an der Kante
-    const edgeY = H - surfaceH;
+    // Spray-Rand + Ticket-Kerben
+    let seed = 0; for (const ch of t.code) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    drawSpray(page, edgeY, seed);
     page.drawCircle({ x: 0, y: edgeY, size: 9, color: hex(C.white) });
     page.drawCircle({ x: W, y: edgeY, size: 9, color: hex(C.white) });
 
     // ---- Infobox
-    const rows = [
-      ['Datum', s.date],
-      ['Einlass', s.time],
-      ['Ort', s.location],
-      ['Preis', s.price],
-    ].filter(r => r[1]);
+    const rows = [['Datum', s.date], ['Einlass', s.time], ['Ort', s.location], ['Preis', s.price]].filter(r => r[1]);
     const labelW = 50;
     const valW = inner - 24 - labelW;
     const rowLines = rows.map(r => wrap(r[1], bold, 10.5, valW));
-    const boxH = 16 + rowLines.reduce((a, l) => a + l.length * 13 + 7, 0) + 6;
-    const boxTop = edgeY - 16;
+    const boxH = 16 + rowLines.reduce((a, l) => a + l.length * 13 + 7, 0) + 4;
+    const boxTop = edgeY - 18;
     page.drawRectangle({ x: PAD, y: boxTop - boxH, width: inner, height: boxH, color: hex(C.infobox) });
     let ry = boxTop - 22;
     rows.forEach((r, idx) => {
-      page.drawText(r[0], { x: PAD + 12, y: ry + 1, size: 8.5, font: reg, color: hex(C.onSurface) });
+      page.drawText(r[0], { x: PAD + 12, y: ry + 1, size: 8.5, font: reg, color: ink });
       rowLines[idx].forEach((ln, li) => {
-        page.drawText(ln, { x: PAD + 12 + labelW, y: ry - li * 13, size: 10.5, font: bold, color: hex(C.onSurface) });
+        page.drawText(ln, { x: PAD + 12 + labelW, y: ry - li * 13, size: 10.5, font: bold, color: ink });
       });
       ry -= rowLines[idx].length * 13 + 7;
     });
 
-    // ---- QR-Code
-    const qrTop = boxTop - boxH - 14;
-    const qrSize = Math.max(100, Math.min(142, qrTop - 84));
-    drawQr(page, t.code, (W - qrSize) / 2, qrTop - qrSize, qrSize);
-    const codeLabel = t.code;
-    page.drawText(codeLabel, {
-      x: (W - reg.widthOfTextAtSize(codeLabel, 9)) / 2, y: qrTop - qrSize - 10, size: 9, font: reg, color: hex(C.onSurface),
-    });
+    // ---- Fußbereich (von unten aufgebaut): Unterstützt durch + Logo · Claim · Hinweis
+    const footBase = 18;
+    const logoMaxH = 24, logoMaxW = 120;
+    page.drawText('Unterstützt durch', { x: PAD, y: footBase + logoMaxH + 7, size: 7, font: reg, color: ink });
+    if (logo) {
+      const sc = Math.min(logoMaxH / logo.height, logoMaxW / logo.width);
+      page.drawImage(logo, { x: PAD, y: footBase, width: logo.width * sc, height: logo.height * sc });
+    } else {
+      page.drawText('UNI:Sport Kassel', { x: PAD, y: footBase + 6, size: 11, font: bold, color: ink });
+    }
+    const claim = 'Sport, Bewegung & Gesundheit.';
+    page.drawText(claim, { x: W - PAD - bold.widthOfTextAtSize(claim, 7.5), y: footBase + 2, size: 7.5, font: bold, color: hex(C.accent) });
+    const lineY = footBase + logoMaxH + 20;
+    page.drawLine({ start: { x: PAD, y: lineY }, end: { x: W - PAD, y: lineY }, thickness: 0.6, color: hex(C.magenta), opacity: 0.6 });
+    const noteLines = wrap(s.note, reg, 7.2, inner).slice(0, 3);
+    const noteTop = lineY + 10 + (noteLines.length - 1) * 9.5;
+    noteLines.forEach((ln, li) => page.drawText(ln, { x: PAD, y: noteTop - li * 9.5, size: 7.2, font: reg, color: ink }));
 
-    // ---- Hinweis + Claim
-    let fy = 50;
-    const noteLines = wrap(s.note, reg, 7.5, inner).slice(0, 3);
-    noteLines.forEach((ln, li) => {
-      page.drawText(ln, { x: PAD, y: fy - li * 10, size: 7.5, font: reg, color: hex(C.onSurface) });
-    });
-    page.drawText('Sport, Bewegung & Gesundheit.', { x: PAD, y: 14, size: 8, font: bold, color: hex(C.accent) });
+    // ---- QR-Code (füllt den Platz zwischen Infobox und Hinweis)
+    const qrTop = boxTop - boxH - 14;
+    const space = qrTop - (noteTop + 12) - 24;
+    const qrSize = Math.max(96, Math.min(150, space));
+    const qrX = (W - qrSize) / 2;
+    drawQr(page, t.code, qrX, qrTop - qrSize, qrSize);
+    page.drawText(t.code, { x: (W - reg.widthOfTextAtSize(t.code, 9)) / 2, y: qrTop - qrSize - 11, size: 9, font: reg, color: ink });
   });
 
   return doc.save();

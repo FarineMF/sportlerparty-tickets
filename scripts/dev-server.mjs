@@ -26,7 +26,7 @@ function memStore(name) {
 }
 _setStoreFactory(memStore);
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".ttf": "font/ttf", ".png": "image/png" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".ttf": "font/ttf", ".png": "image/png", ".svg": "image/svg+xml" };
 const PUB = path.resolve("public");
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");

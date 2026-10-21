@@ -49,7 +49,8 @@ Vorschau-Deploys (Branch/Deploy-Preview) nutzen einen eigenen, leeren Speicher �
 ## Anpassen
 
 - **Partyinfos:** in der App unter Einstellungen
-- **Logo:** in der App unter Einstellungen als PNG hochladen
+- **Logo:** offizielles UNI:Sport-Logo in der App unter Einstellungen als PNG hochladen – erscheint auf Ticket und Mail unter „Unterstützt durch“
+- **Mail:** Betreff, Text, Kleingedrucktes und Antwort-Adresse unter Einstellungen; „Mail-Vorschau“ zeigt die Mail genau so, wie sie verschickt wird
 - **Schrift:** `public/fonts/UniversLTPro-65Bold.ttf` und `public/fonts/UniversLTPro-55Roman.ttf` ablegen – wird automatisch verwendet, sonst Inter.
 
 ## Datenschutz

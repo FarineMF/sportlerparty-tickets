@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="top">
+<div class="top spray">
   <span class="brand">UNI:Sport Kassel</span>
   <span class="title">Sportlerparty Tickets.</span>
   <a class="btn ghost sm" href="/scan">Zum Scanner</a>
@@ -98,9 +98,18 @@
 
     <div class="card" id="mailCard">
       <h2>Automatisch per Mail verschicken.</h2>
-      <div id="mailSetup" class="notice hidden">
-        Noch nicht eingerichtet. In Netlify unter <b>Environment variables</b> anlegen:
-        <code>TICKETS_MAIL_ADRESSE</code> (die Gmail-Adresse) und <code>TICKETS_MAIL_PASSWORT</code> (Gmail-App-Passwort), danach neu deployen.
+      <div id="mailSetup" class="hidden">
+        <div class="notice">Die Mail ist fertig vorbereitet – es fehlt nur noch das Absender-Postfach. Einmalig einrichten (ca. 10 Minuten):</div>
+        <ol class="checklist small">
+          <li>Neues Gmail-Konto anlegen, z. B. <b>sportlerparty.unisport@gmail.com</b>.</li>
+          <li>Im Google-Konto unter <b>Sicherheit</b> die <b>Bestätigung in zwei Schritten</b> einschalten.</li>
+          <li>Auf <b>myaccount.google.com/apppasswords</b> ein App-Passwort erstellen (Name „Sportlerparty“) – du bekommst 16 Zeichen.</li>
+          <li>In Netlify → <b>Site configuration → Environment variables</b> anlegen:<br>
+            <code>TICKETS_MAIL_ADRESSE</code> = die Gmail-Adresse · <code>TICKETS_MAIL_PASSWORT</code> = das App-Passwort</li>
+          <li>Netlify → <b>Deploys → Trigger deploy</b>. Danach erscheint hier der Versand-Knopf.</li>
+        </ol>
+        <p class="small muted">Text, Betreff und Antwort-Adresse der Mail stellst du unter <b>Einstellungen</b> ein.</p>
+        <div class="actions"><button class="btn ghost" data-preview>Mail-Vorschau ansehen</button></div>
       </div>
       <div id="mailReady" class="hidden">
         <p class="muted small">Absender: <b id="mailFrom"></b>. Jede Person bekommt eine Mail mit ihrem PDF im Anhang und dem QR-Code direkt in der Mail.
@@ -111,6 +120,7 @@
           <button class="btn" id="mailStart">Alle noch nicht gemailten senden</button>
           <button class="btn ghost hidden" id="mailStop">Anhalten</button>
         </div>
+        <div class="actions" style="margin-top:6px"><button class="btn ghost sm" data-preview>Mail-Vorschau ansehen</button></div>
         <h3 style="margin-top:20px">Testmail.</h3>
         <div class="row">
           <div><label for="testTo">An</label><input type="email" id="testTo" placeholder="vorname.nachname@uni-kassel.de"></div>
@@ -143,15 +153,20 @@
     </div>
     <div class="card">
       <h3>E-Mail.</h3>
-      <p class="muted small">Nur für den automatischen Versand.</p>
+      <p class="muted small">Für den automatischen Versand. Datum, Einlass, Ort, QR-Code und „Unterstützt durch“ mit Logo werden automatisch ergänzt.</p>
       <label for="s_mail_subject">Betreff</label>
       <input type="text" id="s_mail_subject">
-      <label for="s_mail_text">Text <span class="small">(Platzhalter: {vorname}, {nachname}, {anzahl})</span></label>
-      <textarea id="s_mail_text" style="min-height:160px"></textarea>
+      <label for="s_mail_text">Text <span class="small">(Platzhalter: {vorname}, {nachname}, {anzahl} · Zeilen mit „•“ werden zur Liste)</span></label>
+      <textarea id="s_mail_text" style="min-height:220px"></textarea>
+      <label for="s_mail_footer">Kleingedrucktes unten</label>
+      <textarea id="s_mail_footer" style="min-height:60px"></textarea>
+      <label for="s_reply_to">Antwort-Adresse <span class="small">(wenn jemand auf die Mail antwortet, z. B. eure Uni-Adresse – leer = Gmail-Adresse)</span></label>
+      <input type="email" id="s_reply_to" placeholder="unifit@uni-kassel.de">
+      <div class="actions"><button class="btn ghost" data-preview>Speichern &amp; Mail-Vorschau</button></div>
     </div>
     <div class="card">
       <h3>Logo.</h3>
-      <p class="muted small">Offizielles UNI:Sport-Logo als PNG mit transparentem Hintergrund (nicht verändern).</p>
+      <p class="muted small">Offizielles UNI:Sport-Logo als PNG mit transparentem Hintergrund (Original, nicht verändern). Erscheint auf jedem Ticket und in der Mail unter „Unterstützt durch“ – immer auf Weiß.</p>
       <div id="logoState" class="small"></div>
       <div class="row"><div><input type="file" id="logoFile" accept="image/png"></div></div>
       <div class="actions"><button class="btn ghost sm" id="logoDel">Logo entfernen</button></div>
