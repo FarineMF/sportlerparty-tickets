@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sportlerparty Tickets</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="login">
+  <div class="head">
+    <div class="small"><b>UNI:Sport Kassel</b></div>
+    <h1>Sportlerparty.</h1>
+    <div>Tickets &amp; Einlass.</div>
+  </div>
+  <div class="body">
+    <div class="seg" id="seg">
+      <button type="button" data-role="scan" class="active">Einlass</button>
+      <button type="button" data-role="admin">Verwaltung</button>
+    </div>
+    <form id="f">
+      <div id="devWrap">
+        <label for="device">Name dieses Geräts (z. B. Eingang links)</label>
+        <input type="text" id="device" maxlength="40" autocomplete="off">
+      </div>
+      <label for="secret" id="secretLabel">PIN</label>
+      <input type="password" id="secret" autocomplete="current-password" required>
+      <div id="err" class="notice bad hidden"></div>
+      <div class="actions"><button class="btn" style="width:100%">Anmelden</button></div>
+    </form>
+  </div>
+</div>
+<script src="/login.js"></script>
+</body>
+</html>

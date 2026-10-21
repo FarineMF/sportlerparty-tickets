@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sportlerparty Verwaltung</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="top">
+  <span class="brand">UNI:Sport Kassel</span>
+  <span class="title">Sportlerparty Tickets.</span>
+  <a class="btn ghost sm" href="/scan">Zum Scanner</a>
+  <button class="btn ghost sm" id="logout">Abmelden</button>
+</div>
+<nav class="tabs" id="tabs">
+  <button data-tab="uebersicht" class="active">Übersicht</button>
+  <button data-tab="import">Import</button>
+  <button data-tab="teilnehmer">Teilnehmende</button>
+  <button data-tab="versand">Tickets</button>
+  <button data-tab="einstellungen">Einstellungen</button>
+</nav>
+
+<main>
+  <!-- Übersicht -->
+  <section id="tab-uebersicht">
+    <div class="grid" id="stats"></div>
+    <div class="card" style="margin-top:16px">
+      <h3>Einlass.</h3>
+      <div id="einlassText" class="muted"></div>
+      <div class="progress"><div id="einlassBar"></div></div>
+    </div>
+    <div class="card">
+      <h3>So läuft's.</h3>
+      <ol class="small" style="margin:0;padding-left:18px">
+        <li>Teilnehmerliste aus dem Buchungssystem als Excel/CSV exportieren (mit E-Mail-Spalte).</li>
+        <li>Unter <b>Import</b> hochladen. Bereits importierte Personen werden übersprungen, du kannst also jederzeit nachimportieren.</li>
+        <li>Unter <b>Tickets</b> die neuen Tickets als ZIP herunterladen und über euer Postfach verschicken.</li>
+        <li>Am Partyabend mit dem Handy unter <b>/scan</b> anmelden und scannen.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Import -->
+  <section id="tab-import" class="hidden">
+    <div class="card">
+      <h2>Teilnehmerliste importieren.</h2>
+      <p class="muted small">Excel (.xlsx/.xls) oder CSV aus dem Buchungssystem. Alternativ Tabelle direkt aus Excel kopieren und unten einfügen.</p>
+      <div class="row">
+        <div><label for="file">Datei</label><input type="file" id="file" accept=".xlsx,.xls,.csv,.txt"></div>
+      </div>
+      <label for="paste">… oder hier einfügen</label>
+      <textarea id="paste" placeholder="Anrede	Nachname	Vorname	E-Mail	Status&#10;Frau	Becker	Lena	lena@example.de	S-UNIK"></textarea>
+      <div class="actions"><button class="btn ghost" id="readPaste">Eingefügten Text lesen</button></div>
+    </div>
+
+    <div class="card hidden" id="mapCard">
+      <h3>Spalten zuordnen.</h3>
+      <p class="muted small" id="mapInfo"></p>
+      <div class="grid" id="mapGrid"></div>
+      <div id="payFilter" class="hidden">
+        <label>Nur Zeilen mit diesem Zahlungsstatus importieren</label>
+        <div id="payValues" class="row"></div>
+      </div>
+      <h3 style="margin-top:18px">Vorschau.</h3>
+      <div id="previewInfo" class="notice"></div>
+      <div class="tablewrap"><table id="previewTable"></table></div>
+      <div class="actions"><button class="btn" id="doImport">Importieren &amp; Tickets erzeugen</button></div>
+    </div>
+    <div id="importResult"></div>
+  </section>
+
+  <!-- Teilnehmende -->
+  <section id="tab-teilnehmer" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div style="flex:3 1 240px"><label for="q">Suche (Name, E-Mail, Ticket-Code)</label><input type="search" id="q"></div>
+        <div style="flex:0 0 auto"><a class="btn ghost" href="/api/export.csv">Liste als CSV</a></div>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div class="tablewrap"><table id="ordersTable"></table></div>
+    </div>
+  </section>
+
+  <!-- Tickets -->
+  <section id="tab-versand" class="hidden">
+    <div class="card">
+      <h2>Tickets herunterladen.</h2>
+      <p class="muted small">Ein PDF pro Person im Ordner <b>tickets/</b>, dazu <b>uebersicht.csv</b> mit Name, E-Mail und Dateiname – zum Verschicken über euer eigenes Postfach. Die PDFs werden direkt hier im Browser erstellt, das kann bei vielen Tickets einen Moment dauern.</p>
+      <div id="exportInfo" class="muted"></div>
+      <div class="progress hidden" id="zipProg"><div id="zipBar"></div></div>
+      <div class="actions">
+        <button class="btn" id="zipNew">Nur neue Tickets (ZIP)</button>
+        <button class="btn ghost" id="zipAll">Alle Tickets (ZIP)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Einstellungen -->
+  <section id="tab-einstellungen" class="hidden">
+    <div class="card">
+      <h2>Ticket &amp; Party.</h2>
+      <div class="row">
+        <div><label for="s_headline">Überschrift</label><input type="text" id="s_headline"></div>
+        <div><label for="s_subline">Unterzeile</label><input type="text" id="s_subline"></div>
+      </div>
+      <div class="row">
+        <div><label for="s_date">Datum</label><input type="text" id="s_date"></div>
+        <div><label for="s_time">Einlass</label><input type="text" id="s_time"></div>
+      </div>
+      <div class="row">
+        <div><label for="s_location">Ort</label><input type="text" id="s_location"></div>
+        <div><label for="s_price">Preis</label><input type="text" id="s_price"></div>
+      </div>
+      <label for="s_note">Hinweis unten auf dem Ticket</label>
+      <textarea id="s_note" style="min-height:70px"></textarea>
+      <label for="s_party_name">Kurzname (für Dateinamen)</label>
+      <input type="text" id="s_party_name">
+    </div>
+    <div class="card">
+      <h3>Logo.</h3>
+      <p class="muted small">Offizielles UNI:Sport-Logo als PNG mit transparentem Hintergrund (nicht verändern).</p>
+      <div id="logoState" class="small"></div>
+      <div class="row"><div><input type="file" id="logoFile" accept="image/png"></div></div>
+      <div class="actions"><button class="btn ghost sm" id="logoDel">Logo entfernen</button></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="saveSettings">Speichern</button>
+      <button class="btn ghost" id="previewPdf">Speichern &amp; Ticket-Vorschau</button>
+    </div>
+    <div class="card" style="margin-top:28px">
+      <h3>Nach der Party.</h3>
+      <p class="muted small">Löscht alle Teilnehmenden, Tickets und Scans (Datenschutz). Einstellungen bleiben erhalten. Vorher ggf. CSV exportieren.</p>
+      <button class="btn danger" id="wipe">Alle Teilnehmerdaten löschen</button>
+    </div>
+  </section>
+</main>
+
+<script src="/vendor/xlsx.full.min.js"></script>
+<script src="/vendor/tickets.bundle.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>

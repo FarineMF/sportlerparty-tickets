@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#9FBBD8">
+<title>Einlass Sportlerparty</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { background: var(--white); }
+  .top { padding: 10px 14px; }
+  .count { font-weight: 700; font-size: 18px; margin-left: auto; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 12px 14px 40px; }
+  #reader { width: 100%; border-radius: var(--radius); overflow: hidden; background: #111; min-height: 260px; }
+  #reader video { width: 100% !important; object-fit: cover; }
+  .startbox { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 260px; color: #fff; text-align: center; padding: 20px; }
+  .overlay { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; text-align: center; padding: 24px; cursor: pointer; }
+  .overlay.ok { background: var(--ok); }
+  .overlay.bad { background: var(--bad); }
+  .overlay.warn { background: var(--warn); }
+  .overlay .icon { font-size: 92px; line-height: 1; font-weight: 700; }
+  .overlay .head { font-size: 30px; font-weight: 700; margin-top: 14px; }
+  .overlay .name { font-size: 24px; margin-top: 10px; }
+  .overlay .sub { font-size: 16px; margin-top: 8px; opacity: .9; }
+  .overlay .tap { position: absolute; bottom: 24px; font-size: 13px; opacity: .8; }
+  .hit { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">Einlass.</span>
+  <span class="small" id="dev"></span>
+  <span class="count" id="count">– / –</span>
+</div>
+<div class="wrap">
+  <div id="reader"><div class="startbox" id="startbox">
+    <div>Kamera ist aus.</div>
+    <button class="btn" id="startCam">Scanner starten</button>
+    <div class="small" style="opacity:.8">Beim ersten Mal Kamerazugriff erlauben.</div>
+  </div></div>
+  <div class="actions">
+    <button class="btn ghost sm" id="stopCam">Kamera stoppen</button>
+    <button class="btn ghost sm" id="switchCam">Kamera wechseln</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Code eintippen.</h3>
+    <form id="manual" class="row">
+      <div style="flex:3 1 160px"><input type="text" id="code" placeholder="SP-XXXX-XXXX-XX" autocapitalize="characters" autocomplete="off"></div>
+      <div style="flex:0 0 auto"><button class="btn">Prüfen</button></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Name suchen.</h3>
+    <p class="muted small" style="margin-top:-4px">Falls jemand das Ticket nicht findet – Ausweis kontrollieren!</p>
+    <input type="search" id="search" placeholder="Nachname …" autocomplete="off">
+    <div id="hits"></div>
+  </div>
+  <div class="actions"><a class="btn ghost sm" href="/admin" id="toAdmin">Verwaltung</a><button class="btn ghost sm" id="logout">Abmelden</button></div>
+</div>
+
+<div class="overlay hidden" id="ov">
+  <div class="icon" id="ovIcon"></div>
+  <div class="head" id="ovHead"></div>
+  <div class="name" id="ovName"></div>
+  <div class="sub" id="ovSub"></div>
+  <div class="tap">Tippen zum Weiterscannen</div>
+</div>
+
+<script src="/vendor/html5-qrcode.min.js"></script>
+<script src="/scan.js"></script>
+</body>
+</html>
